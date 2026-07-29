@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>客戶品牌｜精選作品</title>
+  <meta name="description" content="精選短影音作品集" />
+
+  <style>
+    :root {
+      --accent: #0f8a58;       /* 每個客戶可換成他們的品牌色 */
+      --accent-ink: #13a368;
+      --bar: rgba(0, 0, 0, 0.55);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      overscroll-behavior: none;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* ---------- 頂部列：品牌 + CTA + 靜音 ---------- */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      padding-top: max(14px, env(safe-area-inset-top));
+      background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 900;
+      font-size: 17px;
+      letter-spacing: 0.4px;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    }
+    .brand-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 0 4px rgba(15,138,88,0.25);
+    }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 9px 16px;
+      border-radius: 999px;
+      box-shadow: 0 6px 18px rgba(15,138,88,0.4);
+    }
+    .icon-btn {
+      width: 38px; height: 38px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      background: var(--bar);
+      border: 0;
+      color: #fff;
+      cursor: pointer;
+      font-size: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    /* ---------- Reels feed（垂直滑動，一次一支） ---------- */
+    .feed {
+      height: 100dvh;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .feed::-webkit-scrollbar { display: none; }
+
+    .reel {
+      position: relative;
+      height: 100dvh;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      display: grid;
+      place-items: center;
+    }
+
+    .reel-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 460px;
+      background: #0c0c0c;
+      overflow: hidden;
+    }
+    /* 桌機：置中成手機比例卡片 */
+    @media (min-width: 500px) {
+      .reel-inner {
+        height: min(100dvh - 24px, 860px);
+        aspect-ratio: 9 / 16;
+        width: auto;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      }
+    }
+
+    .reel video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #111;
+    }
+
+    /* 暫停時的播放鍵 */
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .reel.paused .play-overlay { opacity: 1; }
+    .play-overlay::before {
+      content: "";
+      width: 0; height: 0;
+      margin-left: 6px;
+      border-style: solid;
+      border-width: 16px 0 16px 26px;
+      border-color: transparent transparent transparent rgba(255,255,255,0.92);
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+    }
+
+    /* 底部資訊 + 每支可選 CTA */
+    .reel-info {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      z-index: 5;
+      padding: 22px 18px 26px;
+      padding-bottom: max(26px, env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+      pointer-events: none;
+    }
+    .reel-info .cap {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.5;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.6);
+      max-width: 90%;
+    }
+    .reel-info .reel-cta {
+      pointer-events: auto;
+      display: inline-flex;
+      margin-top: 12px;
+      background: rgba(255,255,255,0.95);
+      color: #111;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 9px 16px;
+      border-radius: 999px;
+    }
+
+    /* ---------- 加入會員 modal（名單捕捉） ---------- */
+    .member-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .member-backdrop.show { display: flex; animation: fade 0.25s ease; }
+    @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+
+    .member-card {
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      color: #16161a;
+      border-radius: 22px;
+      padding: 26px 22px 22px;
+      text-align: center;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.5);
+      animation: pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+    @keyframes pop { from { transform: translateY(20px) scale(0.96); opacity: 0 } to { transform: none; opacity: 1 } }
+
+    .member-card .badge {
+      width: 52px; height: 52px;
+      margin: 0 auto 14px;
+      border-radius: 50%;
+      background: rgba(15,138,88,0.12);
+      display: grid; place-items: center;
+      color: var(--accent);
+      font-size: 24px;
+    }
+    .member-card h3 { margin: 0 0 8px; font-size: 21px; letter-spacing: -0.5px; }
+    .member-card p { margin: 0 0 18px; color: #6a6a72; font-size: 14.5px; line-height: 1.6; }
+    .member-card input {
+      width: 100%;
+      padding: 13px 14px;
+      margin-bottom: 10px;
+      border: 1px solid #e2e2e6;
+      border-radius: 12px;
+      background: #f7f8f5;
+      font: inherit;
+      color: #16161a;
+    }
+    .member-card input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15,138,88,0.15);
+    }
+    .member-card .submit {
+      width: 100%;
+      margin-top: 4px;
+      padding: 14px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .member-card .submit:active { transform: scale(0.98); }
+    .member-card .skip {
+      display: inline-block;
+      margin-top: 12px;
+      color: #9a9aa2;
+      font-size: 13px;
+      cursor: pointer;
+      background: none; border: 0;
+    }
+    .member-card .done-mark { font-size: 40px; color: var(--accent); }
+
+    /* 第一支的「往上滑」提示，滑動後消失 */
+    .swipe-hint {
+      position: fixed;
+      left: 50%; bottom: 22px;
+      transform: translateX(-50%);
+      z-index: 20;
+      color: rgba(255,255,255,0.85);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+      animation: bob 1.6s ease-in-out infinite;
+      transition: opacity 0.4s ease;
+    }
+    .swipe-hint.hide { opacity: 0; pointer-events: none; }
+    .swipe-hint .arrow { font-size: 18px; }
+    @keyframes bob { 0%,100%{transform:translate(-50%,0)} 50%{transform:translate(-50%,-6px)} }
+    @media (prefers-reduced-motion: reduce) { .swipe-hint { animation: none; } }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" id="brand"><span class="brand-dot"></span><span id="brandName">客戶品牌</span></a>
+    <div class="top-actions">
+      <button class="icon-btn" id="muteBtn" aria-label="靜音切換">🔇</button>
+      <a class="cta" id="topCta" href="#">預約 / 聯絡</a>
+    </div>
+  </header>
+
+  <main class="feed" id="feed"></main>
+
+  <div class="swipe-hint" id="swipeHint"><span class="arrow">↑</span>往上滑看更多</div>
+
+  <!-- 加入會員（名單捕捉） -->
+  <div class="member-backdrop" id="memberModal">
+    <div class="member-card" id="memberCard">
+      <div class="badge">★</div>
+      <h3 id="memberTitle">加入會員，搶先看新作品</h3>
+      <p id="memberDesc">留個聯絡方式，新作品、限定活動與優惠都第一個通知你。</p>
+      <form id="memberForm">
+        <input type="text" id="mName" placeholder="你的名字 / 暱稱" autocomplete="name" />
+        <input type="text" id="mContact" placeholder="LINE ID 或手機（擇一）" autocomplete="tel" />
+        <button type="submit" class="submit" id="mSubmit">加入會員</button>
+      </form>
+      <button class="skip" id="memberSkip">先繼續看</button>
+    </div>
+  </div>
+
+  <script>
+    /* ===================== 每個客戶只改這裡 ===================== */
+    const SITE = {
+      name: "客戶品牌",
+      ctaText: "預約 / 聯絡",
+      ctaUrl: "#",            // 客戶的預約表單 / LINE / 官網連結
+      accent: "#0f8a58",      // 客戶品牌色（可留空用預設）
+
+      // ── 加入會員（名單捕捉）──
+      member: {
+        enabled: true,
+        afterReels: 2,        // 看完第幾支後，自動跳出加入會員（0 = 不自動跳）
+        title: "加入會員，搶先看新作品",
+        desc: "留個聯絡方式，新作品、限定活動與優惠都第一個通知你。",
+        // 每個客戶一個專屬 DropKit 實例的 /api/submit；留空則先存在本機（demo）
+        endpoint: "",
+      },
+    };
+
+    // 精選 Reels：把客戶的 Reels 下載成直式 mp4，放你的儲存（pokkit 等）後填網址
+    // poster = 影片封面圖（選填，載入前先顯示，體驗更順）
+    // cta / ctaUrl = 該支影片專屬導流（選填）
+    const REELS = [
+      { src: "https://www.w3schools.com/html/mov_bbb.mp4", poster: "https://picsum.photos/seed/reel1/450/800", caption: "範例 Reel 1 ｜ 換成客戶的直式作品", cta: "我也要這種內容", ctaUrl: "#" },
+      { src: "https://www.w3schools.com/html/mov_bbb.mp4", poster: "https://picsum.photos/seed/reel2/450/800", caption: "範例 Reel 2 ｜ 滑動切換、自動播放" },
+      { src: "https://www.w3schools.com/html/mov_bbb.mp4", poster: "https://picsum.photos/seed/reel3/450/800", caption: "範例 Reel 3 ｜ 點一下播放/暫停，右上角靜音" },
+    ];
+    /* ========================================================== */
+
+    // 套用設定
+    if (SITE.accent) document.documentElement.style.setProperty("--accent", SITE.accent);
+    document.title = SITE.name + "｜精選作品";
+    document.getElementById("brandName").textContent = SITE.name;
+    const topCta = document.getElementById("topCta");
+    topCta.textContent = SITE.ctaText;
+    topCta.href = SITE.ctaUrl;
+
+    // 建立 reels
+    const feed = document.getElementById("feed");
+    let muted = true;
+
+    REELS.forEach((r, i) => {
+      const reel = document.createElement("section");
+      reel.className = "reel paused";
+
+      const inner = document.createElement("div");
+      inner.className = "reel-inner";
+
+      const v = document.createElement("video");
+      v.src = r.src;
+      if (r.poster) v.poster = r.poster;
+      v.loop = true;
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.preload = i === 0 ? "auto" : "metadata";
+
+      const overlay = document.createElement("div");
+      overlay.className = "play-overlay";
+
+      const info = document.createElement("div");
+      info.className = "reel-info";
+      let infoHtml = r.caption ? `<div class="cap">${r.caption}</div>` : "";
+      if (r.cta) infoHtml += `<a class="reel-cta" href="${r.ctaUrl || SITE.ctaUrl}">${r.cta}</a>`;
+      info.innerHTML = infoHtml;
+
+      inner.appendChild(v);
+      inner.appendChild(overlay);
+      reel.appendChild(inner);
+      reel.appendChild(info);
+      feed.appendChild(reel);
+
+      // 點影片 = 播放/暫停
+      inner.addEventListener("click", () => {
+        if (v.paused) { v.play(); reel.classList.remove("paused"); }
+        else { v.pause(); reel.classList.add("paused"); }
+      });
+    });
+
+    const videos = Array.from(feed.querySelectorAll("video"));
+
+    // 進入畫面的影片自動播放，離開的暫停
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        const v = e.target;
+        const reel = v.closest(".reel");
+        if (e.isIntersecting && e.intersectionRatio > 0.6) {
+          v.muted = muted;
+          v.play().then(() => reel.classList.remove("paused")).catch(() => {});
+        } else {
+          v.pause();
+        }
+      });
+    }, { threshold: [0, 0.6, 1] });
+    videos.forEach((v) => io.observe(v));
+
+    // 靜音切換（全域）
+    const muteBtn = document.getElementById("muteBtn");
+    muteBtn.addEventListener("click", () => {
+      muted = !muted;
+      videos.forEach((v) => (v.muted = muted));
+      muteBtn.textContent = muted ? "🔇" : "🔊";
+    });
+
+    // 滑動後隱藏提示
+    const hint = document.getElementById("swipeHint");
+    feed.addEventListener("scroll", () => hint.classList.add("hide"), { once: true });
+
+    /* ===================== 加入會員 + 瀏覽追蹤 ===================== */
+    const M = SITE.member || {};
+    const modal = document.getElementById("memberModal");
+    const KEY_MEMBER = "rs_member_" + SITE.name;     // 已加入會員就不再跳
+    const KEY_VIEWS = "rs_views_" + SITE.name;
+
+    // 套用客製文案
+    document.getElementById("memberTitle").textContent = M.title || "加入會員";
+    document.getElementById("memberDesc").textContent = M.desc || "";
+
+    // 瀏覽追蹤：累計這個訪客看過幾支、停留多久
+    let viewedCount = 0;
+    const seen = new Set();
+    const sessionStart = Date.now();
+
+    function track(name, data) {
+      // 之後可改成送到你的後端 / GA。現在先存本機，示範「看得到他逛多少」
+      try {
+        const log = JSON.parse(localStorage.getItem(KEY_VIEWS) || "[]");
+        log.push({ name, data, t: Date.now() });
+        localStorage.setItem(KEY_VIEWS, JSON.stringify(log.slice(-200)));
+      } catch (e) {}
+    }
+
+    // 在 IntersectionObserver 計入「看過的影片」
+    const trackIo = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && e.intersectionRatio > 0.6) {
+          const idx = videos.indexOf(e.target);
+          if (!seen.has(idx)) {
+            seen.add(idx);
+            viewedCount = seen.size;
+            track("view_reel", { index: idx });
+            maybeShowMember();
+          }
+        }
+      });
+    }, { threshold: [0.6] });
+    videos.forEach((v) => trackIo.observe(v));
+
+    function alreadyMember() {
+      try { return !!localStorage.getItem(KEY_MEMBER); } catch (e) { return false; }
+    }
+
+    let memberShown = false;
+    function maybeShowMember() {
+      if (!M.enabled || memberShown || alreadyMember()) return;
+      if (M.afterReels > 0 && viewedCount >= M.afterReels) openMember();
+    }
+    function openMember() {
+      memberShown = true;
+      modal.classList.add("show");
+      track("member_prompt", { afterViews: viewedCount });
+    }
+    function closeMember() { modal.classList.remove("show"); }
+
+    document.getElementById("memberSkip").addEventListener("click", closeMember);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeMember(); });
+
+    document.getElementById("memberForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const name = document.getElementById("mName").value.trim();
+      const contact = document.getElementById("mContact").value.trim();
+      if (!name || !contact) return;
+
+      const payload = {
+        name,
+        contact,
+        source: "reels-site",
+        brand: SITE.name,
+        reels_viewed: viewedCount,
+        seconds_on_site: Math.round((Date.now() - sessionStart) / 1000),
+      };
+      track("member_join", payload);
+
+      const finish = () => {
+        try { localStorage.setItem(KEY_MEMBER, "1"); } catch (e) {}
+        const card = document.getElementById("memberCard");
+        card.innerHTML = '<div class="badge done-mark">✓</div>' +
+          '<h3>歡迎加入！</h3>' +
+          '<p>你已經是會員了，新作品與活動我們會第一個通知你。</p>' +
+          '<button class="submit" id="mClose">繼續看作品</button>';
+        document.getElementById("mClose").addEventListener("click", closeMember);
+      };
+
+      if (M.endpoint) {
+        const btn = document.getElementById("mSubmit");
+        btn.disabled = true; btn.textContent = "加入中…";
+        fetch(M.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).then((r) => { if (!r.ok) throw 0; finish(); }).catch(finish);
+      } else {
+        finish(); // demo：無後端時直接完成
+      }
+    });
+  </script>
+</body>
+</html>
