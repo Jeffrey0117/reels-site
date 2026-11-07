@@ -27,6 +27,11 @@ const MIME = {
 const server = http.createServer((req, res) => {
   try {
     const urlPath = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    // 靜態根目錄就是 repo 根目錄 → . 開頭的檔案/資料夾（.env、.git/…）一律不出
+    if (urlPath.split(/[\\/]/).some((seg) => seg.startsWith("."))) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("Not Found");
+      return;
+    }
     let filePath = path.normalize(path.join(ROOT, urlPath));
     if (!filePath.startsWith(ROOT)) {
       res.writeHead(403).end("Forbidden");
